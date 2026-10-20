@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CoreShift — Intelligent Data Center Workload Scheduler</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Top Navigation -->
+        <header class="navbar">
+            <div class="nav-brand">
+                <div class="logo-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                </div>
+                <div class="brand-text">
+                    <span class="brand-title">CoreShift</span>
+                    <span class="brand-subtitle">Workload Orchestration Engine</span>
+                </div>
+                <span class="system-status-badge pulse-dot">Cluster Active</span>
+            </div>
+
+            <div class="nav-actions">
+                <button id="btn-reset-scenario" class="btn btn-secondary" title="Reset to initial seeded scenario">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                        <path d="M3 3v5h5"></path>
+                    </svg>
+                    <span>Reset Scenario</span>
+                </button>
+                <button id="btn-open-submit-modal" class="btn btn-outline">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span>Submit Job</span>
+                </button>
+                <button id="btn-run-cycle" class="btn btn-primary">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>Execute Scheduling Cycle</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Notification Toast Banner -->
+        <div id="toast-banner" class="toast-banner hidden">
+            <span id="toast-message">Notification message</span>
+            <button id="btn-close-toast" class="toast-close">&times;</button>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="dashboard-body">
+            <!-- Metrics Row -->
+            <section class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Jobs</div>
+                    <div class="metric-value" id="metric-total-jobs">-</div>
+                    <div class="metric-sub" id="metric-jobs-breakdown">0 pending, 0 running</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Queue Length</div>
+                    <div class="metric-value text-cyan" id="metric-queue-length">-</div>
+                    <div class="metric-sub" id="metric-ready-jobs">0 ready for dispatch</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Cluster CPU Load</div>
+                    <div class="metric-value text-indigo" id="metric-cluster-cpu">-</div>
+                    <div class="metric-progress-bar">
+                        <div class="metric-progress-fill" id="progress-cluster-cpu" style="width: 0%"></div>
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Cluster Memory Load</div>
+                    <div class="metric-value text-violet" id="metric-cluster-mem">-</div>
+                    <div class="metric-progress-bar">
+                        <div class="metric-progress-fill mem-fill" id="progress-cluster-mem" style="width: 0%"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Workers Section -->
+            <section class="section-container">
+                <div class="section-header">
+                    <h2>Compute Workers & Capacity</h2>
+                    <span class="badge" id="badge-worker-count">3 Nodes</span>
+                </div>
+                <div class="workers-grid" id="workers-container">
+                    <!-- Dynamic Worker Cards -->
+                    <div class="loading-state">Loading worker nodes...</div>
+                </div>
+            </section>
+
+            <!-- Split Section: Dependency Graph & Dispatch Queue -->
+            <section class="two-column-grid">
+                <!-- Dependency Graph Panel -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <h3>Workflow Dependency Graph (DAG)</h3>
+                        <span class="panel-tag" id="dag-cycle-status">Acyclic (Valid)</span>
+                    </div>
+                    <div class="graph-legend">
+                        <span class="legend-item"><span class="legend-dot status-completed"></span>Completed</span>
+                        <span class="legend-item"><span class="legend-dot status-running"></span>Running</span>
+                        <span class="legend-item"><span class="legend-dot status-failed"></span>Failed (Retry)</span>
+                        <span class="legend-item"><span class="legend-dot status-ready"></span>Ready</span>
+                        <span class="legend-item"><span class="legend-dot status-pending"></span>Blocked</span>
+                    </div>
+                    <div class="graph-wrapper">
+                        <canvas id="dag-canvas" width="600" height="340"></canvas>
+                    </div>
+                </div>
+
+                <!-- Scheduling & Retry Queue Panel -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <h3>Priority Dispatch Queue</h3>
+                        <span class="panel-tag" id="queue-count-tag">0 Jobs</span>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Job Name</th>
+                                    <th>Status</th>
+                                    <th>Base</th>
+                                    <th>Effective Priority</th>
+                                    <th>Resources</th>
+                                </tr>
+                            </thead>
+                            <tbody id="queue-table-body">
+                                <tr><td colspan="6" class="text-center">Loading queue...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Jobs Management Section -->
+            <section class="section-container">
+                <div class="section-header">
+                    <h2>Job Execution Registry</h2>
+                    <div class="filter-controls">
+                        <button class="filter-btn active" data-filter="ALL">All</button>
+                        <button class="filter-btn" data-filter="RUNNING">Running</button>
+                        <button class="filter-btn" data-filter="PENDING">Pending</button>
+                        <button class="filter-btn" data-filter="FAILED">Failed</button>
+                        <button class="filter-btn" data-filter="COMPLETED">Completed</button>
+                    </div>
+                </div>
+                <div class="table-container main-jobs-table">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Job ID</th>
+                                <th>Name</th>
+                                <th>Status</th>
+                                <th>Priority</th>
+                                <th>Requirements</th>
+                                <th>Assigned Worker</th>
+                                <th>Retries</th>
+                                <th>Dependencies</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobs-table-body">
+                            <tr><td colspan="9" class="text-center">Loading jobs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Execution Events Log -->
+            <section class="section-container">
+                <div class="section-header">
+                    <h2>Scheduling Event Audit Log</h2>
+                    <span class="panel-tag" id="event-count-tag">Live Stream</span>
+                </div>
+                <div class="events-log-container" id="events-container">
+                    <div class="loading-state">Loading event stream...</div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Submit Job Modal -->
+        <div id="submit-job-modal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Submit New Workload</h3>
+                    <button class="modal-close" id="btn-close-submit-modal">&times;</button>
+                </div>
+                <form id="submit-job-form">
+                    <div class="form-group">
+                        <label for="input-job-name">Job Name</label>
+                        <input type="text" id="input-job-name" required placeholder="e.g. Distributed Embeddings Model">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="input-job-priority">Priority (1 - 10)</label>
+                            <input type="number" id="input-job-priority" min="1" max="10" value="5" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="input-job-cpu">CPU Cores</label>
+                            <input type="number" id="input-job-cpu" min="1" max="16" value="2" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="input-job-memory">Memory (MB)</label>
+                            <input type="number" id="input-job-memory" min="512" max="32768" step="512" value="4096" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="input-job-deps">Prerequisite Dependencies (Select multiple)</label>
+                        <select id="input-job-deps" multiple size="4" class="custom-select">
+                            <!-- Populated dynamically -->
+                        </select>
+                        <span class="form-hint">Hold Ctrl / Cmd to select multiple prerequisite jobs</span>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-submit">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="btn-submit-job-confirm">Submit Workload</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Reassign Worker Modal -->
+        <div id="reassign-modal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <div class="modal-header">
+                    <h3>Reassign Worker</h3>
+                    <button class="modal-close" id="btn-close-reassign-modal">&times;</button>
+                </div>
+                <form id="reassign-form">
+                    <input type="hidden" id="reassign-job-id">
+                    <p class="modal-desc" id="reassign-job-desc">Select destination worker for job</p>
+                    <div class="form-group">
+                        <label for="select-target-worker">Target Worker Node</label>
+                        <select id="select-target-worker" class="custom-select" required>
+                            <!-- Populated dynamically -->
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" id="btn-cancel-reassign">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="btn-confirm-reassign">Reassign</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

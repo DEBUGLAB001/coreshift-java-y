@@ -1,0 +1,15 @@
+{
+  "challenge_id": "coreshift-java-challenge",
+  "runtime_config": {
+    "runtime_type": "java-spring",
+    "install_command": "mvn package -DskipTests -B",
+    "start_command": "./start.sh",
+    "test_command": "./tests/run_tests.sh",
+    "ports": [
+      {
+        "container_port": 3000,
+        "type": "preview"
+      }
+    ]
+  }
+}

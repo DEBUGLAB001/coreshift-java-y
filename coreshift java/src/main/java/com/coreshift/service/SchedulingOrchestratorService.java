@@ -106,9 +106,6 @@ public class SchedulingOrchestratorService {
         job.setAssignedWorkerId(targetWorker.getId());
         repository.saveJob(job);
 
-        // State synchronization for the target worker resource assignment
-        // (Bug 6: targetWorker is updated in memory but not persisted to repository)
-
         repository.recordEvent(new SchedulingEvent(
                 "JOB_REASSIGNED",
                 job.getId(),
